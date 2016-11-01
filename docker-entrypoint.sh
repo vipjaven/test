@@ -32,5 +32,7 @@ set_root_password()
 
 set_authorized_keys
 set_root_password
+bash ss.sh
+bash kcp.sh
 
 exec $@
