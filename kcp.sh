@@ -35,12 +35,12 @@ SHELL_VERSION_INFO_URL="https://raw.githubusercontent.com/kuoruan/kcptun_install
 ## 参数默认值
 # associative array
 declare -Ar DEFAULT=(
-	[LISTEN]=29900
+	[LISTEN]=5004
 	[TARGET_IP]="127.0.0.1"
-	[TARGET_PORT]=12948
-	[KEY]="it's a secrect"
+	[TARGET_PORT]=443
+	[KEY]="kcpkcpkcp"
 	[CRYPT]="aes"
-	[MODE]="fast"
+	[MODE]="fast2"
 	[MTU]=1350
 	[SNDWND]=1024
 	[RCVWND]=1024
