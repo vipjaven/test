@@ -439,7 +439,7 @@ set_target_port() {
 
 		请输入需要加速的端口 [1~65535]
 		EOF
-		target_port=${DEFAULT[TARGET_IP]}
+		target_port=${DEFAULT[TARGET_PORT]}
 		cat >&2 <<-EOF
 		---------------------------
 		加速端口 = ${target_port}

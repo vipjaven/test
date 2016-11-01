@@ -1,77 +1,36 @@
 #!/usr/bin/env bash
 PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:~/bin
 export PATH
-#===================================================================#
-#   System Required:  CentOS6 or 7                                  #
-#   Description: Install Shadowsocks-libev server for CentOS 6 or 7 #
-#   Author: Teddysun <i@teddysun.com>                               #
-#   Thanks: @madeye <https://github.com/madeye>                     #
-#   Intro:  https://teddysun.com/357.html                           #
-#===================================================================#
+#=================================================================#
+#   System Required:  CentOS, Debian, Ubuntu                      #
+#   Description: One click Install Shadowsocks-go server          #
+#   Author: Teddysun <i@teddysun.com>                             #
+#   Thanks: @cyfdecyf <https://twitter.com/cyfdecyf>              #
+#   Intro:  https://teddysun.com/392.html                         #
+#==================================================================
 
-# Current folder
+clear
+echo
+echo "#############################################################"
+echo "# One click Install Shadowsocks-go server                   #"
+echo "# Intro: https://teddysun.com/392.html                      #"
+echo "# Author: Teddysun <i@teddysun.com>                         #"
+echo "# Github: https://github.com/shadowsocks/shadowsocks-go     #"
+echo "#############################################################"
+echo
+
+#Current folder
 cur_dir=`pwd`
 
 # Make sure only root can run our script
 rootness(){
     if [[ $EUID -ne 0 ]]; then
-       echo "Error: This script must be run as root!" 1>&2
+       echo "Error:This script must be run as root!" 1>&2
        exit 1
     fi
 }
 
-# Disable selinux
-disable_selinux(){
-    if [ -s /etc/selinux/config ] && grep 'SELINUX=enforcing' /etc/selinux/config; then
-        sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
-        setenforce 0
-    fi
-}
-
-get_ip(){
-    local IP=$( ip addr | egrep -o '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | egrep -v "^192\.168|^172\.1[6-9]\.|^172\.2[0-9]\.|^172\.3[0-2]\.|^10\.|^127\.|^255\.|^0\." | head -n 1 )
-    [ -z ${IP} ] && IP=$( wget -qO- -t1 -T2 ipv4.icanhazip.com )
-    [ -z ${IP} ] && IP=$( wget -qO- -t1 -T2 ipinfo.io/ip )
-    [ ! -z ${IP} ] && echo ${IP} || echo
-}
-
-get_ipv6(){
-    local ipv6=$(wget -qO- -t1 -T2 ipv6.icanhazip.com)
-    if [ -z ${ipv6} ]; then
-        return 1
-    else
-        return 0
-    fi
-}
-
-get_latest_version(){
-    ver=$(wget -qO- https://api.github.com/repos/shadowsocks/shadowsocks-libev/releases/latest | grep 'tag_name' | cut -d\" -f4)
-    [ -z ${ver} ] && echo "Error: Get shadowsocks-libev latest version failed" && exit 1
-    shadowsocks_libev_ver="shadowsocks-libev-$(echo ${ver} | sed -e 's/^[a-zA-Z]//g')"
-    download_link="https://github.com/shadowsocks/shadowsocks-libev/archive/${ver}.tar.gz"
-    init_script_link="https://raw.githubusercontent.com/teddysun/shadowsocks_install/master/shadowsocks-libev"
-}
-
-check_installed(){
-    if [ "$(command -v "$1")" ]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-print_info(){
-    clear
-    echo "#############################################################"
-    echo "# Install Shadowsocks-libev server for CentOS 6 or 7        #"
-    echo "# Intro:  https://teddysun.com/357.html                     #"
-    echo "# Author: Teddysun <i@teddysun.com>                         #"
-    echo "# Github: https://github.com/shadowsocks/shadowsocks-libev  #"
-    echo "#############################################################"
-    echo
-}
-
-# Check system
+#Check system
 check_sys(){
     local checkType=$1
     local value=$2
@@ -142,48 +101,49 @@ centosversion(){
     fi
 }
 
+# is 64bit or not
+is_64bit(){
+    if [ `getconf WORD_BIT` = '32' ] && [ `getconf LONG_BIT` = '64' ] ; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Disable selinux
+disable_selinux(){
+    if [ -s /etc/selinux/config ] && grep 'SELINUX=enforcing' /etc/selinux/config; then
+        sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+        setenforce 0
+    fi
+}
+
+get_ip(){
+    local IP=$( ip addr | egrep -o '[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}' | egrep -v "^192\.168|^172\.1[6-9]\.|^172\.2[0-9]\.|^172\.3[0-2]\.|^10\.|^127\.|^255\.|^0\." | head -n 1 )
+    [ -z ${IP} ] && IP=$( wget -qO- -t1 -T2 ipv4.icanhazip.com )
+    [ -z ${IP} ] && IP=$( wget -qO- -t1 -T2 ipinfo.io/ip )
+    [ ! -z ${IP} ] && echo ${IP} || echo
+}
+
 # Pre-installation settings
 pre_install(){
-    # Check OS system
-    if check_sys sysRelease centos; then
-        # Not support CentOS 5
-        if centosversion 5; then
-            echo "Not support CentOS 5, please change to CentOS 6 or 7 and try again."
-            exit 1
-        fi
-    else
-        echo "Error: Your OS is not supported to run it, please change OS to CentOS and try again."
+    if ! check_sys packageManager yum && ! check_sys packageManager apt; then
+        echo "Error: Your OS is not supported. please change OS to CentOS/Debian/Ubuntu and try again."
         exit 1
     fi
-
-    # Check installed
-    check_installed "ss-server"
-    if [ $? -eq 0 ]; then
-        echo "Shadowsocks-libev has been installed, nothing to do..."
-        exit 0
-    fi
-
-    print_info
-
-    # Get shadowsocks-libev latest version
-    get_latest_version
-    echo "Get the latest version: ${shadowsocks_libev_ver}"
-    echo
-
-    # Set shadowsocks-libev config password
-    echo "Please input password for shadowsocks-libev"
-    [ -z "${shadowsockspwd}" ] && shadowsockspwd="gogogowebwebweb"
+    # Set shadowsocks-go config password
+    echo "Please input password for shadowsocks-go:"
+    [ -z "${shadowsockspwd}" ] && shadowsockspwd="sssocks"
     echo
     echo "---------------------------"
     echo "password = ${shadowsockspwd}"
     echo "---------------------------"
     echo
-
-    # Set shadowsocks-libev config port
+    # Set shadowsocks-go config port
     while true
     do
-    echo -e "Please input port for shadowsocks-libev [1-65535]"
-    [ -z "$shadowsocksport" ] && shadowsocksport="443"
+    echo -e "Please input port for shadowsocks-go [1-65535]:"
+    [ -z "${shadowsocksport}" ] && shadowsocksport="443"
     expr ${shadowsocksport} + 0 &>/dev/null
     if [ $? -eq 0 ]; then
         if [ ${shadowsocksport} -ge 1 ] && [ ${shadowsocksport} -le 65535 ]; then
@@ -209,52 +169,75 @@ pre_install(){
         stty echo
         stty $SAVEDSTTY
     }
-    echo
-    echo "Press any key to start...or press Ctrl+C to cancel"
-    char=`get_char`
     #Install necessary dependencies
-    yum install -y unzip autoconf automake make zlib-devel libtool libevent xmlto asciidoc pcre pcre-devel openssl-devel gcc perl perl-devel cpio expat-devel gettext-devel
+    if check_sys packageManager yum; then
+        yum install -y wget unzip gzip curl
+    elif check_sys packageManager apt; then
+        apt-get -y update
+        apt-get install -y wget unzip gzip curl
+    fi
     echo
-    cd ${cur_dir}
+
 }
 
-# Download latest shadowsocks-libev
+# Download shadowsocks-go
 download_files(){
-    if [ -f ${shadowsocks_libev_ver}.tar.gz ]; then
-        echo "${shadowsocks_libev_ver}.tar.gz [found]"
-    else
-        if ! wget --no-check-certificate -O ${shadowsocks_libev_ver}.tar.gz ${download_link}; then
-            echo "Failed to download ${shadowsocks_libev_ver}.tar.gz"
+    cd ${cur_dir}
+    if is_64bit; then
+        if ! wget --no-check-certificate -c https://github.com/shadowsocks/shadowsocks-go/releases/download/1.1.5/shadowsocks-server-linux64-1.1.5.gz; then
+            echo "Failed to download shadowsocks-server-linux64-1.1.5.gz"
             exit 1
         fi
+        gzip -d shadowsocks-server-linux64-1.1.5.gz
+        if [ $? -eq 0 ]; then
+            echo "Decompress shadowsocks-server-linux64-1.1.5.gz success."
+        else
+            echo "Decompress shadowsocks-server-linux64-1.1.5.gz failed! Please check gzip command."
+            exit 1
+        fi
+        mv -f shadowsocks-server-linux64-1.1.5 /usr/bin/shadowsocks-server
+    else
+        if ! wget --no-check-certificate -c https://github.com/shadowsocks/shadowsocks-go/releases/download/1.1.5/shadowsocks-server-linux32-1.1.5.gz; then
+            echo "Failed to download shadowsocks-server-linux32-1.1.5.gz"
+            exit 1
+        fi
+        gzip -d shadowsocks-server-linux32-1.1.5.gz
+        if [ $? -eq 0 ]; then
+            echo "Decompress shadowsocks-server-linux32-1.1.5.gz success."
+        else
+            echo "Decompress shadowsocks-server-linux32-1.1.5.gz failed! Please check gzip command."
+            exit 1
+        fi
+        mv -f shadowsocks-server-linux32-1.1.5 /usr/bin/shadowsocks-server
     fi
 
-    # Download init script
-    if ! wget --no-check-certificate -O /etc/init.d/shadowsocks ${init_script_link}; then
-        echo "Failed to download shadowsocks-libev init script!"
-        exit 1
+    # Download start script
+    if check_sys packageManager yum; then
+        if ! wget --no-check-certificate -O /etc/init.d/shadowsocks https://raw.githubusercontent.com/teddysun/shadowsocks_install/master/shadowsocks-go; then
+            echo "Failed to download shadowsocks-go auto start script!"
+            exit 1
+        fi
+    elif check_sys packageManager apt; then
+        if ! wget --no-check-certificate -O /etc/init.d/shadowsocks https://raw.githubusercontent.com/teddysun/shadowsocks_install/master/shadowsocks-go-debian; then
+            echo "Failed to download shadowsocks-go auto start script!"
+            exit 1
+        fi
     fi
 }
 
 # Config shadowsocks
 config_shadowsocks(){
-    local server_value="\"0.0.0.0\""
-    if get_ipv6; then
-        server_value="[\"[::0]\",\"0.0.0.0\"]"
+    if [ ! -d /etc/shadowsocks ]; then
+        mkdir -p /etc/shadowsocks
     fi
-
-    if [ ! -d /etc/shadowsocks-libev ]; then
-        mkdir -p /etc/shadowsocks-libev
-    fi
-    cat > /etc/shadowsocks-libev/config.json<<-EOF
+    cat > /etc/shadowsocks/config.json<<-EOF
 {
-    "server":${server_value},
+    "server":"0.0.0.0",
     "server_port":${shadowsocksport},
-    "local_address":"127.0.0.1",
     "local_port":1080,
     "password":"${shadowsockspwd}",
-    "timeout":600,
-    "method":"aes-256-cfb"
+    "method":"aes-256-cfb",
+    "timeout":600
 }
 EOF
 }
@@ -298,114 +281,97 @@ firewall_set(){
     echo "firewall set completed..."
 }
 
-# Install Shadowsocks-libev
-install_shadowsocks(){
-    tar zxf ${shadowsocks_libev_ver}.tar.gz
-    cd ${shadowsocks_libev_ver}
-    ./configure
-    make && make install
-    if [ $? -eq 0 ]; then
+# Install Shadowsocks-go
+install(){
+
+    if [ -s /usr/bin/shadowsocks-server ]; then
+        echo "shadowsocks-go install success!"
+        chmod +x /usr/bin/shadowsocks-server
         chmod +x /etc/init.d/shadowsocks
-        # Add run on system start up
-        chkconfig --add shadowsocks
-        chkconfig shadowsocks on
-        # Start shadowsocks
+
+        if check_sys packageManager yum; then
+            chkconfig --add shadowsocks
+            chkconfig shadowsocks on
+        elif check_sys packageManager apt; then
+            update-rc.d -f shadowsocks defaults
+        fi
+
         /etc/init.d/shadowsocks start
         if [ $? -eq 0 ]; then
-            echo "Shadowsocks-libev start success!"
+            echo "Shadowsocks-go start success!"
         else
-            echo "Shadowsocks-libev start failure!"
+            echo "Shadowsocks-go start failed!"
         fi
     else
         echo
-        echo "Shadowsocks-libev install failed! Please visit https://teddysun.com/357.html and contact."
+        echo "Shadowsocks-go install failed!"
         exit 1
     fi
 
-    cd ${cur_dir}
-    rm -rf ${shadowsocks_libev_ver} ${shadowsocks_libev_ver}.tar.gz
-
     clear
     echo
-    echo "Congratulations, Shadowsocks-libev install completed!"
+    echo "Congratulations, Shadowsocks-go install completed!"
     echo -e "Your Server IP: \033[41;37m $(get_ip) \033[0m"
     echo -e "Your Server Port: \033[41;37m ${shadowsocksport} \033[0m"
     echo -e "Your Password: \033[41;37m ${shadowsockspwd} \033[0m"
-    echo -e "Your Local IP: \033[41;37m 127.0.0.1 \033[0m"
     echo -e "Your Local Port: \033[41;37m 1080 \033[0m"
     echo -e "Your Encryption Method: \033[41;37m aes-256-cfb \033[0m"
     echo
-    echo "Welcome to visit:https://teddysun.com/357.html"
+    echo "Welcome to visit:https://teddysun.com/392.html"
     echo "Enjoy it!"
     echo
 }
 
-# Uninstall Shadowsocks-libev
-uninstall_shadowsocks_libev(){
-    print_info
-    printf "Are you sure uninstall shadowsocks-libev? (y/n)"
+# Uninstall Shadowsocks-go
+uninstall_shadowsocks_go(){
+    printf "Are you sure uninstall shadowsocks-go? (y/n) "
     printf "\n"
     [ -z ${answer} ] && answer="n"
-
     if [ "${answer}" == "y" ] || [ "${answer}" == "Y" ]; then
-        ps -ef | grep -v grep | grep -i "ss-server" > /dev/null 2>&1
+        ps -ef | grep -v grep | grep -i "shadowsocks-server" > /dev/null 2>&1
         if [ $? -eq 0 ]; then
             /etc/init.d/shadowsocks stop
         fi
-        chkconfig --del shadowsocks
-        rm -fr /etc/shadowsocks-libev
-        rm -f /usr/local/bin/ss-local
-        rm -f /usr/local/bin/ss-tunnel
-        rm -f /usr/local/bin/ss-server
-        rm -f /usr/local/bin/ss-manager
-        rm -f /usr/local/bin/ss-redir
-        rm -f /usr/local/bin/ss-nat
-        rm -f /usr/local/lib/libshadowsocks-libev.a
-        rm -f /usr/local/lib/libshadowsocks-libev.la
-        rm -f /usr/local/include/shadowsocks.h
-        rm -f /usr/local/lib/pkgconfig/shadowsocks-libev.pc
-        rm -f /usr/local/share/man/man1/ss-local.1
-        rm -f /usr/local/share/man/man1/ss-tunnel.1
-        rm -f /usr/local/share/man/man1/ss-server.1
-        rm -f /usr/local/share/man/man1/ss-manager.1
-        rm -f /usr/local/share/man/man1/ss-redir.1
-        rm -f /usr/local/share/man/man1/ss-nat.1
-        rm -f /usr/local/share/man/man8/shadowsocks-libev.8
-        rm -fr /usr/local/share/doc/shadowsocks-libev
+        if check_sys packageManager yum; then
+            chkconfig --del shadowsocks
+        elif check_sys packageManager apt; then
+            update-rc.d -f shadowsocks remove
+        fi
+        # delete config file
+        rm -rf /etc/shadowsocks
+        # delete shadowsocks
         rm -f /etc/init.d/shadowsocks
-        echo "Shadowsocks-libev uninstall success!"
+        rm -f /usr/bin/shadowsocks-server
+        echo "Shadowsocks-go uninstall success!"
     else
         echo
-        echo "uninstall cancelled, nothing to do..."
+        echo "Uninstall cancelled, nothing to do..."
         echo
     fi
 }
 
-# Install Shadowsocks-libev
-install_shadowsocks_libev(){
+# Install Shadowsocks-go
+install_shadowsocks_go(){
     rootness
     disable_selinux
     pre_install
     download_files
     config_shadowsocks
-    firewall_set
-    install_shadowsocks
+    if check_sys packageManager yum; then
+        firewall_set
+    fi
+    install
 }
 
 # Initialization step
 action=$1
 [ -z $1 ] && action=install
 case "$action" in
-    install)
-    install_shadowsocks_libev
-    ;;
-    uninstall)
-    uninstall_shadowsocks_libev
+    install|uninstall)
+    ${action}_shadowsocks_go
     ;;
     *)
     echo "Arguments error! [${action}]"
     echo "Usage: `basename $0` {install|uninstall}"
     ;;
 esac
-
-exec $@
